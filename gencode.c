@@ -24,6 +24,8 @@ static const char rcsid[] _U_ =
     "@(#) $Header: /tcpdump/master/libpcap/gencode.c,v 1.290.2.16 2008-09-22 20:16:01 guy Exp $ (LBL)";
 #endif
 
+#define ENABLE_WLAN_FILTERING_PATCH
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -152,7 +154,8 @@ enum e_offrel {
 	OR_NET,		/* relative to the network-layer header */
 	OR_NET_NOSNAP,	/* relative to the network-layer header, with no SNAP header at the link layer */
 	OR_TRAN_IPV4,	/* relative to the transport-layer header, with IPv4 network layer */
-	OR_TRAN_IPV6	/* relative to the transport-layer header, with IPv6 network layer */
+	OR_TRAN_IPV6,	/* relative to the transport-layer header, with IPv6 network layer */
+	OR_LINK_AFTER_WIRELESS_HDR /* After the 802.11 variable length header */
 };
 
 /*
@@ -212,6 +215,7 @@ static int ethertype_to_ppptype(int);
 static struct block *gen_linktype(int);
 static struct block *gen_snap(bpf_u_int32, bpf_u_int32);
 static struct block *gen_llc_linktype(int);
+static struct block *gen_802_11_llc_linktype(int);
 static struct block *gen_hostop(bpf_u_int32, bpf_u_int32, int, int, u_int, u_int);
 #ifdef INET6
 static struct block *gen_hostop6(struct in6_addr *, struct in6_addr *, int, int, u_int, u_int);
@@ -1654,6 +1658,134 @@ gen_load_macplrel(offset, size)
 	return s;
 }
 
+#ifdef ENABLE_WLAN_FILTERING_PATCH
+static struct slist *
+gen_load_ll_after_802_11_rel(offset, size)
+    u_int offset, size;
+{
+    struct slist *s, *s_load_fc;
+    struct slist *sjset_qos;
+    struct slist *s_load;
+    struct slist *s_ld_a_2;
+    struct slist *s_add_a_x;
+    struct slist *s_a_to_x;
+    struct slist *sjset_data_frame_1;
+    struct slist *sjset_data_frame_2;
+    struct slist *s_load_x_0;
+
+    /*
+     * This code is not compatible with the optimizer, as
+     * we are generating jmp instructions within a normal
+     * slist of instructions
+     *
+     */
+    no_optimize = 1;
+
+    s = gen_llprefixlen();
+
+    /*
+     * If "s" is non-null, it has code to arrange that the X register
+     * contains the length of the prefix preceding the link-layer
+     * header.
+     *
+     * Otherwise, the length of the prefix preceding the link-layer
+     * header is "off_ll".
+     */
+    if (s != NULL) {
+        /*
+         * There's a variable-length prefix preceding the
+         * link-layer header.  "s" points to a list of statements
+         * that put the length of that prefix into the X register.
+         * do an indirect load, to use the X register as an offset.
+         */
+
+        /*
+         * Load the Frame Control field
+         */
+        s_load_fc = new_stmt(BPF_LD|BPF_IND|BPF_B);
+        s_load_fc->s.k = 0;
+    } else {
+        /*
+         * There is no variable-length header preceding the
+         * link-layer header; add in off_ll, which, if there's
+         * a fixed-length header preceding the link-layer header,
+         * is the length of that header.
+         */
+
+        /*
+         * We need to load the Frame control directly, and
+         * then load X with a fake 0, i.e. the length of the
+         * non-existing prepended header
+         */
+
+        /*
+         * TODO GV: I'm not sure if 0 is the right constant in this
+         * case. If the link layer has a fixed length prepended header,
+         * that should be the value that we put here
+         */
+
+        /* Load 0 into X */
+        s_load_x_0 = new_stmt(BPF_LDX|BPF_IMM);
+        s_load_x_0->s.k = 0;
+
+        /*
+         * TODO GV: I'm not sure if 0 is the right constant in this
+         * case. If the link layer has a fixed length prepended header,
+         * that should be the value that we put here
+         */
+
+        /*
+         * load the Frame Control with absolute access
+         */
+        s_load_fc = new_stmt(BPF_LD|BPF_ABS|BPF_B);
+        s_load_fc->s.k = 0;
+        s = s_load_x_0;
+    }
+
+    /*
+     * Generate the common instructions to check if it's a data frame
+     * and if so compute the 802.11 header length
+     */
+    sjset_data_frame_1 = new_stmt(JMP(BPF_JSET));   // b3 should be 1
+    sjset_data_frame_1->s.k = 0x8;
+
+    sjset_data_frame_2 = new_stmt(JMP(BPF_JSET));   // b2 should be 0
+    sjset_data_frame_2->s.k = 0x04;
+
+    sjset_qos = new_stmt(JMP(BPF_JSET));
+    sjset_qos->s.k = 0x80; //QOS bit
+
+    s_ld_a_2 = new_stmt(BPF_LD|BPF_IMM);
+    s_ld_a_2->s.k = 2;
+
+    s_add_a_x = new_stmt(BPF_ALU|BPF_ADD|BPF_X);
+    s_a_to_x = new_stmt(BPF_MISC|BPF_TAX);
+
+    s_load = new_stmt(BPF_LD|BPF_IND|size);
+    s_load->s.k = offset;
+
+    sjset_data_frame_1->s.jt = sjset_data_frame_2;
+    sjset_data_frame_1->s.jf = s_load;
+
+    sjset_data_frame_2->s.jt = s_load;
+    sjset_data_frame_2->s.jf = sjset_qos;
+
+    sjset_qos->s.jt = s_ld_a_2;
+    sjset_qos->s.jf = s_load;
+
+    sappend(s, s_load_fc);
+    sappend(s_load_fc, sjset_data_frame_1);
+    sappend(sjset_data_frame_1, sjset_data_frame_2);
+    sappend(sjset_data_frame_2, sjset_qos);
+    sappend(sjset_qos, s_ld_a_2);
+    sappend(s_ld_a_2, s_add_a_x);
+    sappend(s_add_a_x,s_a_to_x);
+    sappend(s_a_to_x, s_load);
+
+    return s;
+}
+#endif
+
 /*
  * Load a value relative to the beginning of the specified header.
  */
@@ -1678,6 +1810,22 @@ gen_load_a(offrel, offset, size)
 	case OR_MACPL:
 		s = gen_load_macplrel(offset, size);
 		break;
+
+#ifdef ENABLE_WLAN_FILTERING_PATCH
+
+	case OR_LINK_AFTER_WIRELESS_HDR:
+		if (linktype != DLT_IEEE802_11_RADIO 
+			&& linktype != DLT_PPI 
+			&& linktype != DLT_IEEE802_11 
+			&& linktype != DLT_PRISM_HEADER
+			&& linktype != DLT_IEEE802_11_RADIO_AVS)
+		{
+			abort();
+			return NULL;
+		}
+		s = gen_load_ll_after_802_11_rel(offset + 24, size);
+		break;
+#endif /* ENABLE_WLAN_FILTERING_PATCH */
 
 	case OR_NET:
 		s = gen_load_macplrel(off_nl + offset, size);
@@ -3581,6 +3729,113 @@ gen_llc_linktype(proto)
 	}
 }
 
+/*
+ * Generate code to match a particular packet type, for link-layer types
+ * using 802.2 LLC headers.
+ *
+ * This is *NOT* used for Ethernet; "gen_ether_linktype()" is used
+ * for that - it handles the D/I/X Ethernet vs. 802.3+802.2 issues.
+ *
+ * "proto" is an Ethernet type value, if > ETHERMTU, or an LLC SAP
+ * value, if <= ETHERMTU.  We use that to determine whether to
+ * match the DSAP or both DSAP and LSAP or to check the OUI and
+ * protocol ID in a SNAP header.
+ */
+static struct block *
+gen_802_11_llc_linktype(proto)
+	int proto;
+{
+	struct block *b_check_data_frame;
+	struct block *b_check_linktype;
+
+	b_check_data_frame = gen_check_802_11_data_frame();
+
+	/*
+	 * XXX - generate the code that discards non data frames
+	 */
+	switch (proto) {
+
+	case LLCSAP_IP:
+	case LLCSAP_ISONS:
+	case LLCSAP_NETBEUI:
+		/*
+		 * XXX - should we check both the DSAP and the
+		 * SSAP, like this, or should we check just the
+		 * DSAP, as we do for other types <= ETHERMTU
+		 * (i.e., other SAP values)?
+		 */
+		b_check_linktype = gen_cmp(OR_LINK_AFTER_WIRELESS_HDR, 0, BPF_H, (bpf_u_int32)
+			     ((proto << 8) | proto));
+		break;
+
+	case LLCSAP_IPX:
+		/*
+		 * XXX - are there ever SNAP frames for IPX on
+		 * non-Ethernet 802.x networks?
+		 */
+		b_check_linktype = gen_cmp(OR_LINK_AFTER_WIRELESS_HDR, 0, BPF_B,
+		    (bpf_int32)LLCSAP_IPX);
+
+		break;
+
+#if 0
+	case ETHERTYPE_ATALK:
+		/*
+		 * 802.2-encapsulated ETHERTYPE_ATALK packets are
+		 * SNAP packets with an organization code of
+		 * 0x080007 (Apple, for Appletalk) and a protocol
+		 * type of ETHERTYPE_ATALK (Appletalk).
+		 *
+		 * XXX - check for an organization code of
+		 * encapsulated Ethernet as well?
+		 */
+		return gen_snap(0x080007, ETHERTYPE_ATALK, off_linktype);
+#endif
+	default:
+		/*
+		 * XXX - we don't have to check for IPX 802.3
+		 * here, but should we check for the IPX Ethertype?
+		 */
+		if (proto <= ETHERMTU) {
+			/*
+			 * This is an LLC SAP value, so check
+			 * the DSAP.
+			 */
+			b_check_linktype = gen_cmp(OR_LINK_AFTER_WIRELESS_HDR, 0, BPF_B,
+			    (bpf_int32)proto);
+		} else {
+			/*
+			 * This is an Ethernet type; we assume that it's
+			 * unlikely that it'll appear in the right place
+			 * at random, and therefore check only the
+			 * location that would hold the Ethernet type
+			 * in a SNAP frame with an organization code of
+			 * 0x000000 (encapsulated Ethernet).
+			 *
+			 * XXX - if we were to check for the SNAP DSAP and
+			 * LSAP, as per XXX, and were also to check for an
+			 * organization code of 0x000000 (encapsulated
+			 * Ethernet), we'd do
+			 *
+			 *	return gen_snap(0x000000, proto,
+			 *	    off_linktype);
+			 *
+			 * here; for now, we don't, as per the above.
+			 * I don't know whether it's worth the extra CPU
+			 * time to do the right check or not.
+			 */
+			b_check_linktype = gen_cmp(OR_LINK_AFTER_WIRELESS_HDR, 0+6, BPF_H,
+			    (bpf_int32)proto);
+		}
+	}
+
+	gen_and(b_check_data_frame, b_check_linktype);
+	return b_check_linktype;
+
+}
+
+
+
 static struct block *
 gen_hostop(addr, mask, dir, proto, src_off, dst_off)
 	bpf_u_int32 addr;
@@ -3802,6 +4057,17 @@ gen_wlanhostop(eaddr, dir)
 	 * We need to disable the optimizer because the optimizer is buggy
 	 * and wipes out some LD instructions generated by the below
 	 * code to validate the Frame Control bits
+	 */
+	no_optimize = 1;
+#endif /* ENABLE_WLAN_FILTERING_PATCH */
+
+#ifdef ENABLE_WLAN_FILTERING_PATCH
+	/*
+	 * TODO GV 20070613
+	 * We need to disable the optimizer because the optimizer is buggy
+	 * and wipes out some LD instructions generated by the below
+	 * code to validate the Frame Control bits
+	 *
 	 */
 	no_optimize = 1;
 #endif /* ENABLE_WLAN_FILTERING_PATCH */

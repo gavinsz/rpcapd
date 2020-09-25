@@ -95,7 +95,7 @@ pcap_can_set_rfmon(pcap_t *p)
  * For systems where rfmon mode is never supported.
  */
 static int
-pcap_cant_set_rfmon(pcap_t *p _U_)
+pcap_cant_set_rfmon(pcap_t *p)
 {
 	return (0);
 }
@@ -1063,7 +1063,7 @@ pcap_stats(pcap_t *p, struct pcap_stat *ps)
 }
 
 static int
-pcap_stats_dead(pcap_t *p, struct pcap_stat *ps _U_)
+pcap_stats_dead(pcap_t *p, struct pcap_stat *ps)
 {
 	snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 	    "Statistics aren't available from a pcap_open_dead pcap_t");
@@ -1225,7 +1225,7 @@ pcap_cleanup_live_common(pcap_t *p)
 }
 
 static void
-pcap_cleanup_dead(pcap_t *p _U_)
+pcap_cleanup_dead(pcap_t *p)
 {
 	/* Nothing to do. */
 }

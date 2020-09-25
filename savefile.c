@@ -1089,7 +1089,7 @@ sf_setmintocopy(pcap_t *p, int size)
 #endif
 
 static int
-sf_inject(pcap_t *p, const void *buf _U_, size_t size _U_)
+sf_inject(pcap_t *p, const void *buf , size_t size )
 {
 	strlcpy(p->errbuf, "Sending packets isn't supported on savefiles",
 	    PCAP_ERRBUF_SIZE);

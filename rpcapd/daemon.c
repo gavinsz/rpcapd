@@ -719,7 +719,7 @@ int daemon_AuthUserPwd(char *username, char *password, char *errbuf)
 // PORTING WARNING We assume u_int is a 32bit value
 int daemon_findalldevs(SOCKET sockctrl, char *errbuf)
 {
-char sendbuf[RPCAP_NETBUF_SIZE];			// temporary buffer in which data to be sent is buffered
+char sendbuf[RPCAP_NETBUF_SIZE]={0};			// temporary buffer in which data to be sent is buffered
 int sendbufidx= 0;							// index which keeps the number of bytes currently buffered
 pcap_if_t *alldevs;							// pointer to the heade of the interface chain
 pcap_if_t *d;								// temp pointer neede to scan the interface chain
@@ -779,7 +779,7 @@ uint16 nif= 0;								// counts the number of interface listed
 			&sendbufidx, RPCAP_NETBUF_SIZE, SOCKBUF_CHECKONLY, errbuf, PCAP_ERRBUF_SIZE) == -1)
 			return -1;
 
-		memset(findalldevs_if, 0, sizeof(struct rpcap_findalldevs_if) );
+		//memset(findalldevs_if, 0, sizeof(struct rpcap_findalldevs_if) );
 
 		if (d->description) ldescr= (short) strlen(d->description);
 		else ldescr= 0;
@@ -803,6 +803,7 @@ uint16 nif= 0;								// counts the number of interface listed
 			RPCAP_NETBUF_SIZE, SOCKBUF_BUFFERIZE, errbuf, PCAP_ERRBUF_SIZE) == -1)
 			return -1;
 
+		if (NULL != d->addresses){
 		// send all addresses
 		for (address= d->addresses; address != NULL; address= address->next)
 		{
@@ -831,6 +832,7 @@ uint16 nif= 0;								// counts the number of interface listed
 				&sendbufidx, RPCAP_NETBUF_SIZE, SOCKBUF_CHECKONLY, errbuf, PCAP_ERRBUF_SIZE) == -1)
 				return -1;
 			daemon_seraddr( (struct sockaddr_storage *) address->dstaddr, sockaddr);
+		}
 		}
 	}
 
