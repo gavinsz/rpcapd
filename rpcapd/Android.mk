@@ -42,16 +42,17 @@ LOCAL_SRC_FILES := \
 	../pcap-new.c
 
 LOCAL_CFLAGS := -O2
-LOCAL_CFLAGS += -D_U_="__attribute__((unused))" -Dandroid -DHAVE_REMOTE -DHAVE_SNPRINTF
+LOCAL_CFLAGS += -D_U_="__attribute__((unused))" -Dandroid_platform -DHAVE_REMOTE -DHAVE_SNPRINTF -DHAVE_STRLCPY
 
 LOCAL_C_INCLUDES += \
-	device/ascom/external/winpcap
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/../ 
 
 LOCAL_SHARED_LIBRARIES += libcrypto
 
 LOCAL_STATIC_LIBRARIES += winpcap
 
-LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
+#LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
 
 LOCAL_MODULE := rpcapd
 

@@ -53,7 +53,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := -O2 -fPIC
 LOCAL_CFLAGS += -DHAVE_CONFIG_H -D_U_="__attribute__((unused))" -Dlinux -D__GLIBC__ -D_GNU_SOURCE \
-	-DHAVE_REMOTE
+	-DHAVE_REMOTE -DHAVE_STRLCPY
 
 LOCAL_MODULE := winpcap
 

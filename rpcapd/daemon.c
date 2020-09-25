@@ -48,7 +48,7 @@
 #include <pwd.h>		// for password management
 #endif
 
-#if defined(linux) && !defined(android)
+#if defined(linux) && !defined(android_platform)
 #include <shadow.h>		// for password management
 #endif
 
@@ -661,7 +661,7 @@ int daemon_AuthUserPwd(char *username, char *password, char *errbuf)
 */
 
 	struct passwd *user;
-#if defined(linux) && !defined(android)
+#if defined(linux) && !defined(android_platform)
 	struct spwd *usersp;
 #endif
 
@@ -672,7 +672,7 @@ int daemon_AuthUserPwd(char *username, char *password, char *errbuf)
 		return -1;
 	}
 
-#if defined(linux) && !defined(android)
+#if defined(linux) && !defined(android_platform)
 	// This call is needed to get the password; otherwise 'x' is returned
 	if ((usersp= getspnam(username)) == NULL)
 	{
