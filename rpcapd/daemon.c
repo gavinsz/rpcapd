@@ -52,7 +52,9 @@
 #include <shadow.h>		// for password management
 #endif
 
-
+#if defined(android_platform)
+#include "PasswordVerificator.h"
+#endif
 
 // Locally defined functions
 int daemon_checkauth(SOCKET sockctrl, int nullAuthAllowed, char *errbuf);
@@ -671,6 +673,25 @@ int daemon_AuthUserPwd(char *username, char *password, char *errbuf)
 		snprintf(errbuf, PCAP_ERRBUF_SIZE, "Authentication failed: no such user");
 		return -1;
 	}
+
+#if defined(linux) && !defined(android_platform)
+	if (NULL != user->pw_passwd)
+	{
+		if (strcmp(user->pw_passwd, (char *) crypt(password, user->pw_passwd) ) != 0)
+		{
+			snprintf(errbuf, PCAP_ERRBUF_SIZE, "Authentication failed: password incorrect");
+			return -1;
+		}
+		return 0;
+	}
+#endif
+
+#if defined(android_platform)
+    if (0 == verifyPassword(password)) {
+        snprintf(errbuf, PCAP_ERRBUF_SIZE, "Authentication failed: password incorrect");
+        return -1;
+    }
+#endif
 
 #if defined(linux) && !defined(android_platform)
 	// This call is needed to get the password; otherwise 'x' is returned

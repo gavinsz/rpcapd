@@ -46,9 +46,10 @@ LOCAL_CFLAGS += -D_U_="__attribute__((unused))" -Dandroid_platform -DHAVE_REMOTE
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/../ 
+	$(LOCAL_PATH)/../ \
+	$(LOCAL_PATH)/../../../device/audiocodes/common/dropbear/PasswordVerificator
 
-LOCAL_SHARED_LIBRARIES += libcrypto
+LOCAL_SHARED_LIBRARIES += libcrypto libpasswordverificator
 
 LOCAL_STATIC_LIBRARIES += winpcap
 
