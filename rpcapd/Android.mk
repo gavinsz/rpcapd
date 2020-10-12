@@ -41,8 +41,17 @@ LOCAL_SRC_FILES := \
 	../pcap-remote.c \
 	../pcap-new.c
 
-LOCAL_CFLAGS := -O2
+LOCAL_CFLAGS := -O2 -Wall
 LOCAL_CFLAGS += -D_U_="__attribute__((unused))" -Dandroid_platform -DHAVE_REMOTE -DHAVE_SNPRINTF -DHAVE_STRLCPY
+LOCAL_CFLAGS += -Wno-sign-compare
+LOCAL_CFLAGS += -Wno-pointer-sign
+LOCAL_CFLAGS += -Wno-unused-function
+LOCAL_CFLAGS += -Wno-unused-parameter
+LOCAL_CFLAGS += -Wno-unused-variable
+LOCAL_CFLAGS += -Wno-implicit-function-declaration
+LOCAL_CFLAGS += -Wno-unused-result
+LOCAL_CFLAGS += -Wno-pointer-arith
+LOCAL_CFLAGS += -Wno-varargs -Wno-uninitialized
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH) \

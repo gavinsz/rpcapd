@@ -51,10 +51,20 @@ LOCAL_SRC_FILES := \
 	pcap-remote.c \
 	sockutils.c
 
-LOCAL_CFLAGS := -O2 -fPIC
+LOCAL_CFLAGS := -O2 -fPIC -Wall
 LOCAL_CFLAGS += -DHAVE_CONFIG_H -D_U_="__attribute__((unused))" -Dlinux -D__GLIBC__ -D_GNU_SOURCE \
 	-DHAVE_REMOTE -DHAVE_STRLCPY
+LOCAL_CFLAGS += -Wno-sign-compare
+LOCAL_CFLAGS += -Wno-pointer-sign
+LOCAL_CFLAGS += -Wno-unused-function
+LOCAL_CFLAGS += -Wno-unused-parameter
+LOCAL_CFLAGS += -Wno-unused-variable
+LOCAL_CFLAGS += -Wno-implicit-function-declaration
+LOCAL_CFLAGS += -Wno-unused-result
+LOCAL_CFLAGS += -Wno-pointer-arith
+LOCAL_CFLAGS += -Wno-varargs -Wno-uninitialized
 
+TARGET_ERROR_FLAGS :=
 LOCAL_MODULE := winpcap
 
 include $(BUILD_STATIC_LIBRARY)
